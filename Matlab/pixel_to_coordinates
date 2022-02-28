@@ -1,0 +1,97 @@
+%Get RGB camera parameters
+[isOk, RGB_intrinsic] = gen3Kinova.GetIntrinsicParameters(1);
+if ~isOk
+    error('Failed to acquire Intrinsic Parameters for RGB sensor.');
+end
+
+%Get depth camera parameters
+[isOk, Depth_intrinsic] = gen3Kinova.GetIntrinsicParameters(2);
+if ~isOk
+    error('Failed to acquire Intrinsic Parameters for depth sensor.');
+end
+
+%Get another set of parameters...
+[isOk, Extrinsic] = gen3Kinova.GetExtrinsicParameters();
+if ~isOk
+    error('Failed to acquire Extrinsic Parameters.');
+end
+
+
+%Access the RGB chanel
+vidRGB = videoinput('kinova_vision_imaq', 1, 'RGB24');
+vidRGB.FramesPerTrigger = 1;
+
+%Search video source objects associated with the video object and return the video source object
+srcRGB = getselectedsource(vidRGB);
+
+%Modify video source objects associated with the video input object
+srcRGB.Ipv4Address = gen3Kinova.ip_address;
+srcRGB.CloseConnectionOnStop = 'Enabled';
+
+%Connect to depth stream of camera
+vidDepth = videoinput('kinova_vision_imaq', 2, 'MONO16');
+vidDepth.FramesPerTrigger = 1;
+srcDepth = getselectedsource(vidDepth);
+
+srcDepth.Ipv4Address = gen3Kinova.ip_address;
+srcDepth.CloseConnectionOnStop = 'Enabled';
+
+%Get images from camera
+depthData = getsnapshot(vidDepth);
+rgbData = getsnapshot(vidRGB);
+
+%Focal point - check units
+fx = RGB_intrinsic.focal_length_x;
+fy = RGB_intrinsic.focal_length_y;
+
+%Resolution
+x_res = 1920;
+y_res = 1080;
+
+i = %x location of pixel from vision system
+j = %y location of pixel from vision system
+
+%Convert pixel location to relative to center
+i = x_res/2 - i;
+j = y_res/2 - j
+
+%Flip picture horizontally and vertically
+i = -i;
+j = -j;
+
+w = %get depth from depth camera
+p = 0.0081; %Scalar multiplier
+gripper_length = 0.170; %May need to be adjusted...
+
+u = (fx-w)/fx*i*p;
+v = (fy-w)/fy*j*p;
+
+%Cordinates in reference to colour sensor
+P_C = [u; v; w; 1];
+
+%Transformation matrix to camera frame - may not need this
+T_SC = [1, 0, 0, 0;
+        0, 1, 0, 0;
+        0, 0, 1, fx;
+        0, 0, 0, 1];
+
+%Transformation matrix from colour camera frame to end effector
+T_CE = [1, 0, 0, 0;
+        0, 1, 0, -0.05639;
+        0, 0, 1, 0.00305;
+        0, 0, 0, 1];
+
+%Transformation matrix from depth camera frame to end effector
+T_DE = [1, 0, 0, -0.02750;
+        0, 1, 0, -0.06600;
+        0, 0, 1, 0.00305;
+        0, 0, 0, 1];
+
+%Transformation matrix from end effector to gripper
+T_EG = [1, 0, 0, 0;
+        0, 1, 0, 0;
+        0, 0, 1, gripper_length;
+        0, 0, 0, 1];
+
+%Coordinates in reference to gripper location
+P_G = T_EG * T_CE * T_SC * P_C;
