@@ -51,35 +51,38 @@ class PeachDetector:
 
   def plot_boxes_original_image(self, frame, coords):
     for x1, y1, x2, y2 in coords:
-      cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+      cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
     return frame
 
 
   def predict(self, image):
     frame = cv2.imread(image)
     original_height, original_width = frame.shape[0], frame.shape[1]
+    original_image = frame
 
     frame = cv2.resize(frame, (416, 416))
 
     results = self.detect_peaches(frame)
     frame, coordinates = self.plot_boxes(results, frame)
 
-    original_predicted_image = self.plot_boxes_original_image(frame, coordinates)
-    cv2.imwrite('predicted_image.png', original_predicted_image)
-
     translated_coordinates = []
+    center_points = []
 
     for x1, y1, x2, y2 in coordinates:
       x1_translated = (original_width/416) * x1
       y1_translated = (original_height/416) * y1
       x2_translated = (original_width/416) * x2
       y2_translated = (original_height/416) * y2
+      translated_coordinates.append([x1_translated, y1_translated, x2_translated, y2_translated])
 
       center_x = (x1_translated + x2_translated)/2
       center_y = (y1_translated + y2_translated)/2
-      translated_coordinates.append([center_x, center_y])
+      center_points.append([center_x, center_y])
+    
+    original_predicted_image = self.plot_boxes_original_image(original_image, translated_coordinates)
+    cv2.imwrite('predicted_image.png', original_predicted_image)
 
-    return translated_coordinates #resized to proper res
+    return center_points #resized to proper res
 
 # Initialize NN 
 
