@@ -3,6 +3,8 @@ import numpy as np
 import cv2
 from PIL import Image
 from time import time
+import os.path
+from os import path
 
 class PeachDetector:
 
@@ -44,7 +46,7 @@ class PeachDetector:
         cv2.putText(frame, self.class_to_label(labels[i]), (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2, cv2.LINE_AA)
     return frame
 
-  def __call__(self):
+  def predict(self):
     frame = cv2.imread('test_peach_img.jpeg')
     frame = cv2.resize(frame, (416, 416))
 
@@ -52,7 +54,7 @@ class PeachDetector:
     results = self.detect_peaches(frame)
     frame = self.plot_boxes(results, frame)
     end_time = time()
-    fps = 1/np.round(end_time - start_time, 2)
+    # fps = 1/np.round(end_time - start_time, 2)
     # print(f'Frames Per Second : {fps}')
 
     # cv2.putText(frame, f'FPS: {int(fps)}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
@@ -66,6 +68,11 @@ class PeachDetector:
     #   if cv2.waitKey(5) & 0xFF == 27:
     #     break
 
-def predict():
-  detector = PeachDetector(capture_index=1, model_name='best.pt')
-  detector()
+# def predict():
+#   detector = PeachDetector(capture_index=1, model_name='best.pt')
+#   detector()
+
+# while 1:
+#   while 
+
+path.exists('test_peach_img.jpeg'

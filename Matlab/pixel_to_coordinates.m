@@ -35,7 +35,9 @@ if ~isOk
     error('Failed to acquire Extrinsic Parameters.');
 end
 
-
+% coord = [2.6 46.43 356.22 214.97 162.74 347.51 282.18]; % HOME
+coord = [156.79 279.96 358.81 255.66 288.05 269.36 274.68];
+joint(gen3, coord);
 
 
 %Access the RGB chanel
@@ -72,8 +74,14 @@ fy = 4.88;
 x_res = 1280; %1920;
 y_res = 720; %1080;
 
-i = x_res/2+300; %x location of pixel from vision system
-j = y_res/2; %y location of pixel from vision system
+i_in=50; %Left-right if orineted with gripper +L, -R
+j_in=0; %Up- Down , +UP, - Down
+w_in=100; %Depth, +Out, - retract
+
+% Centers at (0, 0), top left (-1280, -720), bottom right (1280, 720)
+i = i_in-0.25; %x location of pixel from vision system
+j =j_in-184.8; %y location of pixel from vision system
+% i =-0.25, j= -184.8
 
 %Convert pixel location to relative to center
 %i = x_res/2 - i;
@@ -83,8 +91,10 @@ j = y_res/2; %y location of pixel from vision system
 i = -i;
 j = -j;
 
-w = 300; %get depth from depth camera
-p = 0.0081; %Scalar multiplier
+% -181.7 is depth 0, > -181.7 forward, < -181.7 backward
+
+w = w_in-178; %get depth from depth camera
+p = 0.0081; %Scalar multiplier - 0.0081
 gripper_length = 0.170; %May need to be adjusted...
 
 u = (fx-w)/fx*i*p/1000; %convert to m
@@ -92,7 +102,7 @@ v = (fy-w)/fy*j*p/1000; % convert to m
 
 %Cordinates in reference to colour sensor
 P_C = [u; v; w/1000; 1];
-P_C = [u; v; 0; 1]
+% P_C = [u; v; 0; 1]
 
 %Transformation matrix to camera frame - may not need this
 T_SC = [1, 0, 0, 0;
@@ -195,6 +205,30 @@ function command_cartesian(gen3, command)
         
         [isOk,~, ~, ~] = gen3.SendRefreshFeedback();
         pause(1);
+
+        if isOk
+            disp('Command sent to the robot. Wait for the robot to stop moving.');
+            
+            [~,status] = gen3.GetMovementStatus();
+        else
+            disp('Command error.');
+        end
+    end
+end
+
+function joint(gen3, command)
+    jointCmd = command;
+    constraintType = int32(0);
+    speed = 0;
+    duration = 0;
+
+    isOk = gen3.SendJointAngles(jointCmd, constraintType, speed, duration);
+
+    status = 1;
+    while status
+        
+        [isOk,~, ~, ~] = gen3.SendRefreshFeedback();
+        pause(1)
 
         if isOk
             disp('Command sent to the robot. Wait for the robot to stop moving.');
