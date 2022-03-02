@@ -1,4 +1,4 @@
-function P = pixel_to_coord(gen3, depth)
+function P = pixel_to_coordinates(gen3, depth)
 
     f = kinova_api_wrapper;
 

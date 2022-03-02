@@ -12,8 +12,8 @@ classdef constants
         OPEN_GRIPPER = 0;
         CLOSE_GRIPPER = 1;
         % Capture Mode
-        RGB = 'rgb'
-        DEPTH = 'depth'
-        RGB_DEPTH = 'rgb_depth'
+        RGB = 'rgb';
+        DEPTH = 'depth';
+        RGB_DEPTH = 'rgb_depth';
     end
 end

@@ -2,11 +2,17 @@
 clc
 
 global f c
-gen3 = connect();
+
 f = kinova_api_wrapper;
 c = constants;
 
-pick_peaches(gen3);
+gen3 = f.run_initalization();
+
+% pick_peaches(gen3);
+
+capture_img(c.RGB)
+%     
+peach_coords = read_coordinates_from_file();
 
 
 gen3.DestroyRobotApisWrapper();
@@ -20,7 +26,9 @@ function pick_peaches(gen3)
     
     % --- Vision Method --- %
     capture_img(c.RGB_DEPTH)
-    % Found peach
+    
+    % peach_coords = read_coordinates_from_file();
+
     found_pech = [-0.68 -0.052 0.45];
     
     % Get current cartesian pose of tool      
