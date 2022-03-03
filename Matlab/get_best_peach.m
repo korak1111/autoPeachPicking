@@ -3,10 +3,12 @@ function found_peach = get_best_peach(gen3, peach_coordinates)
     
     f = kinova_api_wrapper;
     c = constants;
-    command = get_curr_pose(gen3);
+    command = f.get_curr_pose(gen3);
     best_dist=inf;
     best_n=0;
-    for n=1:size(peach_coordinates,1)
+    disp(peach_coordinates)
+
+    for n=1:size(peach_coordinates, 1)
         abs_x = abs(command(1)-peach_coordinates(n,1));
         abs_y = abs(command(2)-peach_coordinates(n,2));
         dist=sqrt(abs_x^2 + abs_y^2);
@@ -16,4 +18,5 @@ function found_peach = get_best_peach(gen3, peach_coordinates)
             best_n=n;
         end
     end
-    found_peach = peach_coordinates(best_n,1);
+    found_peach = peach_coordinates(best_n, :);
+end

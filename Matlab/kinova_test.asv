@@ -1,162 +1,195 @@
 
-%clear all
 clc
-% Robot laying on table rest position
-% TABLE_POSITION = [-0.014 0.589 0.001 91.2 1.5 174.5] % cart coords
-TABLE_POSITION = [272.98 86.37 173.84 244.56 359.57 109.91 98.39];
-% Home starting position of robot
-% HOME_POSITION = [-0.434 -0.025 0.453 -90.2 176.6 86.7]; % cart coords
-HOME_POSITION = [2.6 46.43 356.22 214.97 162.74 347.51 282.18];
-% Peach collection area position (0, 0)
-% COLLECTION_POSITION = [0.632 -0.037 0.169 -176.2 1.4 92.1]; % cart coords
-COLLECTION_POSITION = [0.11 11.34 180.48 246.48 185.44 50.35 84.22];
-% Gripper Commands
-OPEN_GRIPPER = 0; CLOSE_GRIPPER = 1;
 
-% Connect to robot and api
-gen3 = connect();
+global f c peaches_picked
 
-% Move to tabletop position
-joint(gen3, TABLE_POSITION);
+f = kinova_api_wrapper;
+c = constants;
+peaches_picked = 0;
 
-% Move to home position
-joint(gen3, HOME_POSITION);
+gen3 = f.run_initalization();
 
-tool(gen3, OPEN_GRIPPER);
- 
-% Found peach
-found_pech = [-0.68 -0.052 0.45];
+% while ~terminate
+    terminate = pick_peaches(gen3);
+% end
 
-% Get current tool pose
-curr_pose = get_curr_pose(gen3);
+f.toggle_tool_state(gen3, c.OPEN_GRIPPER);
 
-% Create cart_cmd and send to move tool to that position while keeping the
-% existing tool orientation
-command = [found_pech(1), found_pech(2), found_pech(3), curr_pose(4), curr_pose(5), curr_pose(6)];
-
-% Move to peach location
-command_cartesian(gen3, command);
- 
-% Close the gripper
-tool(gen3, CLOSE_GRIPPER);
-
-% ---- Harvet Method ----- %
-command = get_curr_position(gen3);
-% Rotate gripper by 45 degrees
-command(7) = command(7) + 45;
-
-% Command joint movement to twist gripper
-joint(gen3, command);
-
-command = get_curr_pose(gen3);
-% Move gripper down 15cm
-command(3) = command(3) - 0.15;
-
-% Command movement to pull down
-command_cartesian(gen3, command);
-
-% ---- Collection Method ----- %
-% Comand movement to return peach to collection area
-joint(gen3, COLLECTION_POSITION);
-
-% Release Gripper
-tool(gen3, OPEN_GRIPPER);
-
-% Return to Home position
-joint(gen3, HOME_POSITION);
 
 gen3.DestroyRobotApisWrapper();
 
-function gen3 = connect()
-    Simulink.importExternalCTypes(which('kortex_wrapper_data.h'));
-    gen3 = kortex();
-    gen3.ip_address = '192.168.1.10';
-    gen3.user = 'admin';
-    gen3.password = 'admin';
 
-    isOk = gen3.CreateRobotApisWrapper();
+function terminate = pick_peaches(gen3)
+    global f c peaches_picked
 
-    if isOk
-       disp('You are connected to the robot!'); 
-    else
-       error('Failed to establish a valid connection!');
-    end
+    terminate = false;
 
-    % Connect to vision module
-    imaqregister('C:\Program Files\Kinova\Vision Imaq\kinova_vision_imaq.dll');
-end
+%     f.set_joint_angles(gen3, c.TABLE_POSITION);
+    f.set_joint_angles(gen3, c.HOME_POSITION);
 
-function gen3 = tool(gen3, command)
-    % 1 fully close, 0 fully open
-    toolCmd = command;
-    toolMode = int32(3);
-    toolDuration = 0; 
-
-    isOk = gen3.SendToolCommand(toolMode, toolDuration, toolCmd);
-
-    pause(1)
+%     f.toggle_tool_state(gen3, c.OPEN_GRIPPER);
     
-    if isOk
-        disp('Command sent to the gripper. Wait for the gripper to open.')
-    else
-        error('Command Error.');
+    %% --- Vision Method --- %%
+    capture_img(c.RGB_DEPTH);
+    peach_pixels = read_coordinates_from_file() %Get pixel Locatoins
+
+    if (peaches_picked == 4) || isempty(peach_pixels) %Terimantion Condtions
+        terminate = true;
+        return
     end
-end
 
-function joint(gen3, command)
-    jointCmd = command;
-    constraintType = int32(0);
-    speed = 0;
-    duration = 0;
+    depth_img = imread('depth_img.png');
+    peach_coordinates = [];
 
-    isOk = gen3.SendJointAngles(jointCmd, constraintType, speed, duration);
+    %% Determine which peach to pick 
+    
+    for n=1:size(peach_pixels,1)
+        x_RGB_res = 1920;
+        y_RGB_res = 1080;
+        x_depth_res = 480;
+        y_depth_res = 270;
 
-    status = 1;
-    while status
-        
-        [isOk,~, ~, ~] = gen3.SendRefreshFeedback();
-        pause(1)
+        x = peach_pixels(n,1);
+        y = peach_pixels(n,2);
 
-        if isOk
-            disp('Command sent to the robot. Wait for the robot to stop moving.');
-            
-            [~,status] = gen3.GetMovementStatus();
-        else
-            disp('Command error.');
-        end
+        x_depth = round(x*x_depth_res/x_RGB_res)+1;
+        y_depth = round(y*y_depth_res/y_RGB_res)+1;
+    
+        depth = double(depth_img(y_depth, x_depth));
+
+        curr_coord = pixel_to_coordinates(gen3, depth, x, y, 0);
+        peach_coordinates = [peach_coordinates; transpose(curr_coord)];
+
     end
+
+%     found_peach = get_best_peach(gen3, peach_coordinates);
+    found_peach = [-0.751 0.127 0.376];
+
+    
+    % Get current cartesian pose of tool      
+    curr_pose = f.get_curr_pose(gen3);
+    
+    % Create command to move tool to peach position while keeping the
+    % existing tool orientation
+    command = [found_peach(1), found_peach(2), found_peach(3), ...
+        curr_pose(4), curr_pose(5), curr_pose(6)];
+    
+    % Move to peach location
+    f.set_arm_pose(gen3, command);
+
+    curr_pose = f.get_curr_pose(gen3);
+    
+%     if sum(curr_pose == command) ~= length(command)
+%         f.set_joint_angles(gen3, c.HOME_POSITION);
+%     end
+% 
+%     while sum(curr_pose == command) ~= length(command)
+%     %     Move forward 10cm and try again
+%     
+%         update_pose = curr_pose;
+%         update_pose(1) = update_pose(1) - 0.1;
+%     
+%         f.set_arm_pose(gen3, update_pose);
+%         
+%         curr_pose = f.get_curr_pose(gen3)
+%     
+%         f.set_arm_pose(gen3, command);
+%     
+%         curr_pose = f.get_curr_pose(gen3)
+%     
+%     end
+    
+    harvest_peach(gen3);
+%     
+%     % Move to collection position and drop peach in tray
+%     new_collection_position = update_collection(gen3, peaches_picked);
+%     f.set_joint_angles(gen3, new_collection_position); 
+%     peaches_picked = peaches_picked +1;
+%     f.toggle_tool_state(gen3, c.OPEN_GRIPPER);
+% 
+%     f.set_joint_angles(gen3, c.HOME_POSITION);
+% 
+
 end
 
-function command_cartesian(gen3, command)
-    cartCmd = command;
-    constraintType = int32(0);
-    speeds = [0, 0];
-    duration = 0;
-     
-    isOk = gen3.SendCartesianPose(cartCmd, constraintType, speeds, duration);
+function harvest_peach(gen3)
+    global f c
+    % Grab Peach
+    f.toggle_tool_state(gen3, c.CLOSE_GRIPPER);
 
-    status = 1;
-    while status
-        
-        [isOk,~, ~, ~] = gen3.SendRefreshFeedback();
-        pause(1);
+    command = f.get_curr_pose(gen3);
+    command(3) = command(3) - 0.02;
+    f.set_arm_pose(gen3, command);
 
-        if isOk
-            disp('Command sent to the robot. Wait for the robot to stop moving.');
-            
-            [~,status] = gen3.GetMovementStatus();
-        else
-            disp('Command error.');
-        end
-    end
+    % Get current joint angles
+    command = f.get_curr_joint_angles(gen3);
+    % Rotate gripper by 45 degrees
+    command(7) = command(7) + 65;
+    
+    % Command joint movement to twist gripper
+    f.set_joint_angles(gen3, command);
+    
+    % Get current cartesian pose
+    command = f.get_curr_pose(gen3);
+    % Move gripper down 5cm
+    command(3) = command(3) - 0.03;
+    % Pull 5cm away from the tree
+    command(1) = command(1) + 0.2;
+    
+    % Command movement to pull down
+    f.set_arm_pose(gen3, command);
 end
 
-function curr_pose = get_curr_pose(gen3)
-    [~, baseFb, ~, ~] = gen3.SendRefreshFeedback();
-    curr_pose = baseFb.tool_pose;
-end
+% 
+% % capture_img(c.RGB_DEPTH);
+% depth_img = imread('depth_img.png');
+% rgb_img = imread('rgb_img.png');
+% 
+% % h = imshow(rgb_img);
+% % hp = impixelinfo;
+% 
+% %x = 1460; %pixel
+% %y = 765; %pixel
+% 
+% x = 340;
+% y = 950;
+% 
+% x_RGB_res = 1920;
+% y_RGB_res = 1080;
+% x_depth_res = 480;
+% y_depth_res = 270;
+% 
+% x_depth = round(x*x_depth_res/x_RGB_res)+1;
+% y_depth = round(y*y_depth_res/y_RGB_res)+1;
+% 
+% %depth = double(depth_img(y_depth, x_depth))
+% depth = 630;
+% 
+% P = pixel_to_coordinates(gen3, depth, x, y, 0);
+% 
+% curr_pose = f.get_curr_pose(gen3);
+% command = [curr_pose(1) + P(1), curr_pose(2) + P(2), curr_pose(3) + P(3), curr_pose(4), curr_pose(5), curr_pose(6)]
 
-function jointAngles = get_curr_position(gen3)
-    [~, ~, actuatorsFb, ~] = gen3.SendRefreshFeedback();
-    jointAngles = actuatorsFb.position;
-end
+
+% f.set_arm_pose(gen3, command);
+% 
+% curr_pose = f.get_curr_pose(gen3);
+
+% while sum(curr_pose == command) ~= length(command)
+% %     Move forward 10cm and try again
+
+%     update_pose = curr_pose;
+%     update_pose(1) = update_pose(1) - 0.1;
+% 
+%     f.set_arm_pose(gen3, update_pose);
+%     
+%     curr_pose = f.get_curr_pose(gen3)
+% 
+%     f.set_arm_pose(gen3, command);
+% 
+%     curr_pose = f.get_curr_pose(gen3)
+
+% end
+
+% [-0.758 0.145 0.362];
+

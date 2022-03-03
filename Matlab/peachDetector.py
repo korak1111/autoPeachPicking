@@ -84,25 +84,35 @@ class PeachDetector:
 
     return center_points #resized to proper res
 
-# Initialize NN 
-
-detector = PeachDetector(capture_index=1, model_name='best.pt')
-
-file_name='rgb_img.png'
-
-#Master Script Loop
-while 1:
+def run_script():
   no_picture = True
   while no_picture: # Waiting for a picutre to be delivered
     no_picture = not path.exists(file_name) # check if a file is there
-    print("No Picture Found")
+    #print("No Picture Found")
 
-  time.sleep(0.5)
   coords = detector.predict(file_name)  # Get Coordinates of Bounding Box
-  os.remove(file_name) # Delete Picture
+  
 
-  with open('coords.txt', 'x') as f: #Write to a file and release control of file
+  with open('coords.txt', 'w') as f: #Write to a file and release control of file
     for x, y in coords:
       line = str(x) + ' ' + str(y)
       f.write(str(line))
       f.write('\n')
+ 
+
+# Initialize NN 
+
+detector = PeachDetector(capture_index=1, model_name='best.pt')
+print("Ready")
+file_name='rgb_img.png'
+
+
+
+#Master Script Loop
+while 1:
+  try: 
+    run_script()
+    os.remove(file_name) # Delete Picture
+  except AttributeError:
+    pass
+

@@ -23,7 +23,7 @@ classdef kinova_api_wrapper
     end
 
     methods
-        function gen3 = toggle_tool_state(gen3, command)
+        function gen3 = toggle_tool_state(obj, gen3, command)
             % 1 fully close, 0 fully open
             toolCmd = command;
             toolMode = int32(3);
@@ -40,7 +40,7 @@ classdef kinova_api_wrapper
             end
         end
         
-        function set_joint_angles(gen3, command)
+        function set_joint_angles(obj, gen3, command)
             jointCmd = command;
             constraintType = int32(0);
             speed = 0;
@@ -64,7 +64,7 @@ classdef kinova_api_wrapper
             end
         end
         
-        function set_arm_pose(gen3, command)
+        function set_arm_pose(obj, gen3, command)
             cartCmd = command;
             constraintType = int32(0);
             speeds = [0, 0];
@@ -88,12 +88,12 @@ classdef kinova_api_wrapper
             end
         end
         
-        function curr_pose = get_curr_pose(gen3)
+        function curr_pose = get_curr_pose(obj, gen3)
             [~, baseFb, ~, ~] = gen3.SendRefreshFeedback();
             curr_pose = baseFb.tool_pose;
         end
         
-        function curr_joint_angles = get_curr_joint_angles(gen3)
+        function curr_joint_angles = get_curr_joint_angles(obj, gen3)
             [~, ~, actuatorsFb, ~] = gen3.SendRefreshFeedback();
             curr_joint_angles = actuatorsFb.position;
         end

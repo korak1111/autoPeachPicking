@@ -11,6 +11,7 @@ classdef constants
         % Gripper Commands
         OPEN_GRIPPER = 0;
         CLOSE_GRIPPER = 1;
+        PARTIAL_CLOSE_GRIPPER = 0.75;
         % Capture Mode
         RGB = 'rgb';
         DEPTH = 'depth';
