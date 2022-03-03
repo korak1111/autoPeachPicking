@@ -2,11 +2,13 @@
 function capture_img(mode)
     imaqreset;
     imaqhwinfo;
+
+    c = constants;
     
-    if mode == c.RGB || mode == c.RGB_DEPTH
+    if strcmp(mode, c.RGB) || strcmp(mode, c.RGB_DEPTH)
         capture_rgb_img()
     end
-    if mode == c.DEPTH || mode == c.RGB_DEPTH
+    if strcmp(mode, c.DEPTH) || strcmp(mode, c.RGB_DEPTH)
         capture_depth_img()
     end
 end
@@ -23,7 +25,7 @@ function capture_rgb_img()
     
     preview(vid1);
     rgbData = getsnapshot(vid1);
-    imwrite(rgbData, 'rbg_img.png')
+    imwrite(rgbData, 'rgb_img.png')
     
     closepreview(vid1);
     delete(vid1);
