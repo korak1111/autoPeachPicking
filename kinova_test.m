@@ -20,8 +20,8 @@ k.cleanup_on_teardown(gen3);
 
 function [terminate, peaches_picked] = pick_peaches(gen3, peaches_picked)
     % Move arm to home position and open gripper
-    k.set_joint_angles(gen3, c.HOME_POSITION);
-    k.toggle_tool_state(gen3, c.OPEN_GRIPPER);
+    k.set_joint_angles(gen3, k.HOME_POSITION);
+    k.toggle_tool_state(gen3, k.OPEN_GRIPPER);
 
     % Capture rgb and depth images
     k.capture_img(k.RGB_DEPTH);
@@ -54,15 +54,15 @@ function [terminate, peaches_picked] = pick_peaches(gen3, peaches_picked)
     harvest_peach(gen3);
 
     % Move to collection position and drop peach in tray
-    k.set_joint_angles(gen3, c.COLLECTION_POSITION);
+    k.set_joint_angles(gen3, k.COLLECTION_POSITION);
     collection_position = p.update_collection_position(gen3, peaches_picked);
     k.set_arm_pose(gen3, collection_position); 
 
-    k.toggle_tool_state(gen3, c.OPEN_GRIPPER);
+    k.toggle_tool_state(gen3, k.OPEN_GRIPPER);
 
     peaches_picked = peaches_picked +1;
 
-    k.set_joint_angles(gen3, c.HOME_POSITION);
+    k.set_joint_angles(gen3, k.HOME_POSITION);
 end
 
 function harvest_peach(gen3)

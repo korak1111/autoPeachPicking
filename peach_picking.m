@@ -5,8 +5,8 @@ classdef peach_picking
     properties (Constant)
         k = kinova_api_wrapper
         collection_tray_size = [2 2]
-        collection_tray_delta_x = 0.125;
-        collection_tray_delta_y = 0.125;
+        collection_tray_delta_x = 0.125
+        collection_tray_delta_y = 0.125
     end
 
     methods (Static)
@@ -52,17 +52,17 @@ classdef peach_picking
         end
 
         function position = update_collection_position(obj, peaches_picked)
-            position = f.COLLECTION_POSITION;
+            position = obj.k.COLLECTION_POSITION;
 
             i = mod(peaches_picked, obj.collection_tray_size(1)) + 1;
-            j = floor(peaches_picked/obj.collection_tray_size(2)) + 1;
+            j = floor(peaches_picked / obj.collection_tray_size(2)) + 1;
 
             for x = 1:i-1
-                position(1) = position(1) - delta_x;
+                position(1) = position(1) - obj.collection_tray_delta_x;
             end
             
             for y = 1:j-1
-                position(2) = position(2) + delta_y; 
+                position(2) = position(2) + obj.collection_tray_delta_y; 
             end
         end
     end
