@@ -8,19 +8,21 @@ classdef kinova_api_wrapper
     end
     
     properties (Constant)
-        % Arm resting on table
-        TABLE_POSITION = [272.98 86.37 173.84 244.56 359.57 109.91 98.39];
         % Arm in starting position to begin looking for peaches
-        HOME_POSITION = [2.6 46.43 356.22 214.97 162.74 347.51 282.18];
+        HOME_POSITION = [175.61 48.36 14.26 311.46 173.46 88.66 283.78];
         % Collection area position (0,0) located in top left corner of tray
-        COLLECTION_POSITION = [0.11 11.34 180.48 246.48 185.44 50.35 84.22];
+        COLLECTION_POSITION = [160.73 64.31 58.17 298.78 246.62 38.73 283.79];
+        % Position for end sequence clapping
+        CLAP_POSITION = [175.64 49.96 14.65 314 250 55 279.86];
         % Gripper Commands
         OPEN_GRIPPER = 0;
         CLOSE_GRIPPER = 1;
         % Capture Mode
-        RGB = 'rgb';
-        DEPTH = 'depth';
-        RGB_DEPTH = 'rgb_depth';
+        RGB = 'RGB';
+        DEPTH = 'DEPTH';
+        RGB_DEPTH = 'RGB_DEPTH';
+        % Resolution
+        RGB_RESOLUTION = [1920 1080];
     end
 
     methods
@@ -59,16 +61,16 @@ classdef kinova_api_wrapper
             srcDepth.ResetROIOnResolutionChange = 'Disabled';
         end
 
-        function capture_img(mode)
+        function capture_img(obj, mode)
             % imaqreset;
             % imaqhwinfo;
-            
-            if strcmp(mode, obj.k.RGB) || strcmp(mode, obj.k.RGB_DEPTH)
-                rgbData = getsnapshot(obj.k.vidRGB);
+
+            if strcmp(mode, obj.RGB) || strcmp(mode, obj.RGB_DEPTH)
+                rgbData = getsnapshot(obj.vidRGB);
                 imwrite(rgbData, 'rgb_img.png')
             end
-            if strcmp(mode, c.DEPTH) || strcmp(mode, c.RGB_DEPTH)
-                depthData = getsnapshot(obj.k.vidDepth);
+            if strcmp(mode, obj.DEPTH) || strcmp(mode, obj.RGB_DEPTH)
+                depthData = getsnapshot(obj.vidDepth);
                 imwrite(depthData, 'depth_img.png')
             end
         end
@@ -83,6 +85,11 @@ classdef kinova_api_wrapper
             curr_joint_angles = actuatorsFb.position;
         end
         
+        function intrinsic_paramters = get_intrinsic_parameters(obj, gen3)
+            [~, RGB_intrinsic] = gen3.GetIntrinsicParameters(1);
+            intrinsic_paramters = RGB_intrinsic;
+        end
+
         function set_arm_pose(obj, gen3, command)
             cartCmd = command;
             constraintType = int32(0);
@@ -97,9 +104,7 @@ classdef kinova_api_wrapper
                 [isOk,~, ~, ~] = gen3.SendRefreshFeedback();
                 pause(1);
         
-                if isOk
-                    disp('Command sent to the robot. Wait for the robot to stop moving.');
-                    
+                if isOk  
                     [~,status] = gen3.GetMovementStatus();
                 else
                     disp('Command error.');
@@ -121,8 +126,6 @@ classdef kinova_api_wrapper
                 pause(1)
         
                 if isOk
-                    disp('Command sent to the robot. Wait for the robot to stop moving.');
-                    
                     [~,status] = gen3.GetMovementStatus();
                 else
                     disp('Command error.');
@@ -135,13 +138,10 @@ classdef kinova_api_wrapper
             toolMode = int32(3);
             toolDuration = 0; % use default value
         
-            isOk = gen3.SendToolCommand(toolMode, toolDuration, toolCmd);
-        
+            isOk = gen3.SendToolCommand(toolMode, toolDuration, toolCmd);    
             pause(1)
             
-            if isOk
-                disp('Command sent to the gripper. Wait for the gripper to open.')
-            else
+            if ~isOk
                 error('Command Error.');
             end
         end

@@ -1,89 +1,67 @@
 
-global k p
-
 k = kinova_api_wrapper;
 p = peach_picking;
 peaches_picked = 0;
-terminate = false;
+terminate = p.RUNNING;
 
-gen3 = k.run_initalization();
+[k, gen3] = k.run_initalization();
 
-k.set_joint_angles(gen3, k.TABLE_POSITION);
+k.toggle_tool_state(gen3, k.OPEN_GRIPPER);
+k.set_joint_angles(gen3, k.HOME_POSITION);
 
-while ~terminate
-    [terminate, peaches_picked] = pick_peaches(gen3, peaches_picked);
+while strcmp(terminate, p.RUNNING)
+    [terminate, peaches_picked] = pick_peaches(gen3, k, p, peaches_picked);
 end
-pick_peaches(gen3);
+
+p.end_sequence(gen3, terminate);
 
 k.cleanup_on_teardown(gen3);
 
 
-function [terminate, peaches_picked] = pick_peaches(gen3, peaches_picked)
-    % Move arm to home position and open gripper
-    k.set_joint_angles(gen3, k.HOME_POSITION);
-    k.toggle_tool_state(gen3, k.OPEN_GRIPPER);
-
-    % Capture rgb and depth images
+function [terminate, peaches_picked] = pick_peaches(gen3, k, p, peaches_picked)
     k.capture_img(k.RGB_DEPTH);
 
-    % Wait to recieve peach pixel location of identified peaches 
-    peach_pixels = k.read_coordinates_from_file();
+    disp("Running Neural Network");
+    % Wait to recieve peach pixel locations of identified peaches 
+    peach_pixels = p.read_coordinates_from_file()
+    disp("Image Recognition Complete");
 
     % Exit if there are no peaches identified or the collection try is full
-    if peaches_picked == 4 || isempty(peach_pixels)
-        terminate = true;
+    if peaches_picked == 4
+        terminate = p.COLLECTION_TRAY_FULL;
         return
-    end
-
-    peach_coords = zeros(size(peach_pixels));
-
-    % Convert each found peach to coordinate locations
-    for i = 1:size(peach_pixels)
-        % --- Depth Calculation --- %
-
-        peach_coords(i) = 0; % insert found coordinate from depth
+    elseif isempty(peach_pixels)
+        terminate = p.OUT_OF_PEACHES;
+        return
+    else
+        terminate = p.RUNNING;
     end
 
     % Calculate the closest peach to the gripper
-    closest_peach = k.get_closest_peach(gen3, peach_coords);
+    closest_peach = p.get_closest_peach(gen3, peach_pixels);
+    x = closest_peach(1);
+    y = closest_peach(2);
 
-    % --- Depth Movement --- %
-    % insert move to center peach and then move in to grab peach
-          
+    depth = p.get_depth(x, y);
 
-    harvest_peach(gen3);
+    % Move to peach
+    peach_offset = p.pixel_to_coordinates(gen3, depth, x, y);
+    curr_pose = k.get_curr_pose(gen3);
+    command = [curr_pose(1) + peach_offset(1), curr_pose(2) + peach_offset(2), ...
+        curr_pose(3) + peach_offset(3), curr_pose(4), curr_pose(5), curr_pose(6)];
+    k.set_arm_pose(gen3, command);     
+
+    p.harvest_peach(gen3);
 
     % Move to collection position and drop peach in tray
+    k.set_joint_angles(gen3, k.HOME_POSITION);
     k.set_joint_angles(gen3, k.COLLECTION_POSITION);
-    collection_position = p.update_collection_position(gen3, peaches_picked);
-    k.set_arm_pose(gen3, collection_position); 
+
+    p.update_collection_position(gen3, peaches_picked);
 
     k.toggle_tool_state(gen3, k.OPEN_GRIPPER);
 
-    peaches_picked = peaches_picked +1;
+    peaches_picked = peaches_picked + 1;
 
     k.set_joint_angles(gen3, k.HOME_POSITION);
-end
-
-function harvest_peach(gen3)
-    % Grab Peach
-    k.toggle_tool_state(gen3, k.CLOSE_GRIPPER);
-
-    % Pull down slightly to eliminate slack
-    pose_cmd = k.get_curr_pose(gen3);
-    pose_cmd(3) = pose_cmd(3) - 0.02;
-    k.set_arm_pose(gen3, pose_cmd);
-
-    % Rotate gripper by 45 degrees
-    joint_cmd = k.get_curr_joint_angles(gen3);
-    joint_cmd(7) = joint_cmd(7) + 65;
-    k.set_joint_angles(gen3, joint_cmd);
-    
-    % Move away from the tree
-    pose_cmd = k.get_curr_pose(gen3);
-    % Move down 3cm
-    pose_cmd(3) = pose_cmd(3) - 0.03;
-    % Pull 20cm away from the tree
-    pose_cmd(1) = pose_cmd(1) + 0.2;
-    k.set_arm_pose(gen3, pose_cmd);
 end
